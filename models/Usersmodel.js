@@ -12,6 +12,9 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true },
   password: { type: String, required: true },
   profilePicture: { type: String, default: 'default-profile-pic-url' },
+  // profilePicture: { type: mongoose.Schema.Types.ObjectId, ref: "uploads.files" }, // Reference to GridFS file
+ 
+
   bio: { type: String,  maxlength: 150 },
   followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
