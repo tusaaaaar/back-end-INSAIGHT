@@ -16,8 +16,8 @@ const userSchema = new mongoose.Schema({
  
 
   bio: { type: String,  maxlength: 150 },
-  followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-  following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Users' }],
+  following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Users' }],
   posts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Post' }],
   likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Post' }],
   savedPosts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Post' }],

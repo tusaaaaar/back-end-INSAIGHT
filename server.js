@@ -10,6 +10,8 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const bycrypt = require('bcryptjs');
 
+
+
 //for pic
 const multer = require("multer");
 const path = require("path");
@@ -79,7 +81,8 @@ mongoose.connect(process.env.MONGO_DB, {
 
 
 
-
+const postRoutes = require("./routes/postRoutes"); // Import post routes
+app.use("/posts", postRoutes);  // Now "/api/posts/create" is accessible
 
 
 
@@ -518,7 +521,338 @@ app.get("/users/:id", async (req, res) => {
 
 
 
-//update user data
+//fetch all users except the current logged in user
+
+// app.get('/all/:userId', async (req, res) => {
+//   try {
+//     console.log("Find all users route was called.");
+    
+//     const userId = req.params.userId;
+//     console.log("Received userId:", userId);
+
+//     const users = await Users.find({ _id: { $ne: userId } }).select('username profilePicture');
+    
+//     console.log("All users fetched from backend:", users);
+//     res.status(200).json(users);
+//   } catch (error) {
+//     console.error("Error fetching users:", error);
+//     res.status(500).json({ message: "Error fetching users", error });
+//   }
+// });
+
+app.get('/all/:userId', async (req, res) => {
+  try {
+    console.log("Fetching all users except followed ones...");
+    const { userId } = req.params;
+
+    // Find the logged-in user's following list
+    const loggedInUser = await Users.findById(userId).select("following");
+
+    if (!loggedInUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Fetch all users **except** the logged-in user and those they already follow
+    const users = await Users.find({
+      _id: { $ne: userId, $nin: loggedInUser.following }, // Exclude logged-in user & followed users
+    }).select("username profilePicture");
+
+    res.status(200).json(users);
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({ message: "Error fetching users", error });
+  }
+});
+
+
+// //follow unfollow users
+// app.post('/follow/:userId/:targetUserId', async (req, res) => {
+//   try {
+//     const { userId, targetUserId } = req.params;
+
+//     // 🟢 Find users
+//     const user = await Users.findById(userId);
+//     const targetUser = await Users.findById(targetUserId);
+
+//     if (!user || !targetUser) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+
+//     // 🟢 Toggle Follow/Unfollow
+//     if (user.following.includes(targetUserId)) {
+//       user.following = user.following.filter((id) => id !== targetUserId);
+//       targetUser.followers = targetUser.followers.filter((id) => id !== userId);
+//     } else {
+//       user.following.push(targetUserId);
+//       targetUser.followers.push(userId);
+//     }
+
+//     await user.save();
+//     await targetUser.save();
+
+//     res.status(200).json({ message: "Follow status updated" });
+//   } catch (error) {
+//     res.status(500).json({ message: "Error updating follow status", error });
+//   }
+// });
+
+
+//follow/unfollow
+// app.post("/follow/:userId/:targetId", async (req, res) => {
+//   console.log("users made follow unfolow request ");
+//   const { userId, targetId } = req.params;
+
+//   try {
+//     const user = await Users.findById(userId);
+//     const targetUser = await Users.findById(targetId);
+
+//     if (!user || !targetUser) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+
+//     const isFollowing = user.following.includes(targetId);
+
+//     if (isFollowing) {
+//       // If already following, unfollow
+//       user.following = user.following.filter((id) => id.toString() !== targetId);
+//       targetUser.followers = targetUser.followers.filter((id) => id.toString() !== userId);
+//     } else {
+//       // Otherwise, follow
+//       user.following.push(targetId);
+//       targetUser.followers.push(userId);
+//     }
+
+//     await user.save();
+//     await targetUser.save();
+
+//     res.status(200).json({ isFollowing: !isFollowing });
+//   } catch (error) {
+//     console.error("Error updating follow status:", error);
+//     res.status(500).json({ message: "Internal server error" });
+//   }
+// });
+app.post("/follow/:userId/:targetId", async (req, res) => {
+  console.log("Users made follow/unfollow request");
+
+  try {
+    
+    const userId = new mongoose.Types.ObjectId(req.params.userId);
+    const targetId = new mongoose.Types.ObjectId(req.params.targetId);
+
+    console.log(userId, " wants to follow/unfollow ", targetId);
+
+    const user = await Users.findById(userId);
+    const targetUser = await Users.findById(targetId);
+
+    if (!user || !targetUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const isFollowing = user.following.includes(targetId);
+
+    if (isFollowing) {
+      // Unfollow
+      user.following = user.following.filter((id) => !id.equals(targetId));
+      targetUser.followers = targetUser.followers.filter((id) => !id.equals(userId));
+    } else {
+      // Follow
+      user.following.push(targetId);
+      targetUser.followers.push(userId);
+    }
+
+    await user.save();
+    await targetUser.save();
+
+    res.status(200).json({ isFollowing: !isFollowing });
+  } catch (error) {
+    console.error("Error updating follow status:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+
+
+
+
+// // 🟢 Get full user details by ID (without Router)
+// app.get("/user/:userId", async (req, res) => {
+//   try {
+//     console.log("username in mini users ",req.params.userId);
+//     const user = await Users.findById(req.params.userId).populate("followers following", "username profilePic");
+//     if (!user) return res.status(404).json({ message: "User not found" });
+
+//     res.status(200).json({
+//       _id: user._id,
+//       username: user.username,
+//       profilePicture: user.profilePic,
+//       bio: user.bio,
+//       posts: user.posts,
+//       followers: user.followers,
+//       following: user.following,
+//       isFollowing: false, // Set in frontend based on logged-in user
+//     });
+//   } catch (error) {
+//     console.error("Error fetching user profile:", error);
+//     res.status(500).json({ message: "Internal server error" });
+//   }
+// });
+
+
+// // Route to get followers list
+// app.get("/user/:id/followers", async (req, res) => {
+//   console.log("followers request made by id", req.params.id);
+
+//   try {
+//     const user = await Users.findById(req.params.id).populate("followers", "username profilePicture");
+
+//     if (!user) return res.status(404).json({ message: "User not found" });
+
+//     console.log("User's followers list:", user.followers);
+//     res.status(200).json(user.followers);
+
+//   } catch (error) {
+//     console.error("Error while searching for followers list:", error);
+//     res.status(500).json({ message: "Internal server error" });
+//   }
+// });
+
+
+
+//followers list
+app.get("/user/:id/followers", async (req, res) => {
+  console.log("Fetching followers for user ID:", req.params.id);
+
+  try {
+    // Fetch the logged-in user (whose followers we are viewing)
+    const user = await Users.findById(req.params.id)
+      .populate("followers", "username profilePicture");
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // `user.followers` contains all users following the logged-in user.
+    // Check if the logged-in user follows each of them.
+    const followersList = user.followers.map((follower) => ({
+      _id: follower._id,
+      username: follower.username,
+      profilePicture: follower.profilePicture,
+      isFollowing: user.following.includes(follower._id), // Check if user follows them
+    }));
+
+    console.log("User's followers list:", followersList);
+    res.status(200).json(followersList);
+
+  } catch (error) {
+    console.error("Error while fetching followers list:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+
+
+// //route to get following list
+// app.get("/user/:id/following", async (req, res) => {
+//   console.log("following request made by id", req.params.id);
+
+//   try {
+//     const user = await Users.findById(req.params.id).populate("following", "username profilePicture");
+
+//     if (!user) return res.status(404).json({ message: "User not found" });
+
+//     console.log("User's following list:", user.following);
+//     res.status(200).json(user.following);
+
+//   } catch (error) {
+//     console.error("Error while searching for following list:", error);
+//     res.status(500).json({ message: "Internal server error" });
+//   }
+// });
+
+//following list with isfollowing
+app.get("/user/:id/following", async (req, res) => {
+  console.log("Following request made by id:", req.params.id);
+
+  try {
+    const user = await Users.findById(req.params.id)
+      .populate("following", "username profilePicture");
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // `user.following` contains the users that the logged-in user is following.
+    const followingList = user.following.map((followingUser) => ({
+      _id: followingUser._id,
+      username: followingUser.username,
+      profilePicture: followingUser.profilePicture,
+      isFollowing: true, // Always true, because this is the "following" list
+    }));
+
+    console.log("User's following list:", followingList);
+    res.status(200).json(followingList);
+
+  } catch (error) {
+    console.error("Error while fetching following list:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+
+
+
+// //following list route
+// app.get("/user/:id/following", async (req, res) => {
+//   console.log("Following request made by user ID:", req.params.id);
+
+//   try {
+//     // Fetch the logged-in user (whose following list we are viewing)
+//     const user = await Users.findById(req.params.id)
+//       .populate("following", "username profilePicture");
+
+//     if (!user) return res.status(404).json({ message: "User not found" });
+
+//     // `user.following` contains all users the logged-in user is following.
+//     // Check if each of these users also follows the logged-in user (mutual follow).
+//     const followingList = user.following.map((followedUser) => ({
+//       _id: followedUser._id,
+//       username: followedUser.username,
+//       profilePicture: followedUser.profilePicture,
+//       isFollowing: user.followers.includes(followedUser._id), // Check if mutual follow
+//     }));
+
+//     console.log("User's following list:", followingList);
+//     res.status(200).json(followingList);
+
+//   } catch (error) {
+//     console.error("Error while fetching following list:", error);
+//     res.status(500).json({ message: "Internal server error" });
+//   }
+// });
+
+// Search route
+app.get("/search", async (req, res) => {
+  try {
+    const { query } = req.query;
+    if (!query) return res.status(400).json({ message: "Query is required" });
+
+    const users = await Users.find({
+      $or: [
+        { username: { $regex: `^${query}`, $options: "i" } }, // Case-insensitive username search
+        { name: { $regex: `^${query}`, $options: "i" } } // Case-insensitive name search
+      ]
+    }).select("username name profilePicture"); // Ensure 'name' field exists in the model
+
+    res.json(users);
+  } catch (error) {
+    console.error("Search Error:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+
+
+
+
+
+
+
 
 
 
