@@ -846,6 +846,9 @@ app.get("/search", async (req, res) => {
   }
 });
 
+const ecoRoute = require("./routes/ecoRoutes");
+app.use("/api/eco",ecoRoute);
+
 
 
 
