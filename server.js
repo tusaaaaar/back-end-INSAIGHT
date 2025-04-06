@@ -557,7 +557,7 @@ app.get('/all/:userId', async (req, res) => {
     // Fetch all users **except** the logged-in user and those they already follow
     const users = await Users.find({
       _id: { $ne: userId, $nin: loggedInUser.following }, // Exclude logged-in user & followed users
-    }).select("username profilePicture");
+    }).select("username profilePicture bio name");
 
     res.status(200).json(users);
   } catch (error) {
@@ -880,7 +880,7 @@ app.get('/profile/:id', async (req, res) => {
     const followersCount = user.followers.length;
     const followingCount = user.following.length;
     const postCount = posts.length;
-
+      
     // Send full profile object
     res.json({
       user,
