@@ -111,25 +111,68 @@ router.get("/user/:userId/posts", async (req, res) => {
 
 
 //get all the saved posts of a user
-router.get("/user/:userId/saved",async(req,res)=>{
-  const {userId} = req.params;
-  console.log("USer mase request for his saved posts",userId);
-  try{
-    const user= await Users.findById(userId).populate("savedPosts");
-    if(!user)
-    {
-      return res.status(404).json({ error: "User not found" });
+// router.get("/user/:userId/saved",async(req,res)=>{
+//   const {userId} = req.params;
+//   console.log("USer mase request for his saved posts",userId);
+//   try{
+//     const user= await Users.findById(userId).populate("savedPosts");
+//     if(!user)
+//     {
+//       return res.status(404).json({ error: "User not found" });
  
-    }
-    res.status(200).json(user.savedPosts || []);
+//     }
+//     res.status(200).json(user.savedPosts || []);
 
-  }
-   catch (error) {
-    console.error("Error fetching user saved  posts:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+//   }
+//    catch (error) {
+//     console.error("Error fetching user saved  posts:", error);
+//     res.status(500).json({ error: "Internal Server Error" });
   
+//   }
+// });
+
+router.get("/user/:userId/saved", async (req, res) => {
+  const { userId } = req.params;
+  console.log("User made request for their saved posts", userId);
+
+  try {
+    const user = await Users.findById(userId).populate({
+      path: "savedPosts",
+      populate: [
+        {
+          path: "user", // This populates the user who created the post
+          select: "username profilePicture"
+        },
+        {
+          path: "comments", // If you want full comments later
+          select: "_id" // Just counting comments here
+        }
+      ]
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Format posts to include the needed info
+    const postsWithExtras = user.savedPosts.map(post => ({
+      _id: post._id,
+      caption: post.caption,
+      images: post.images, // post media
+      content: post.content,
+      likesCount: post.likes?.length || 0,
+      commentsCount: post.comments?.length || 0,
+      postedBy: post.user, // populated user info
+      createdAt: post.createdAt,
+    }));
+
+    res.status(200).json(postsWithExtras);
+  } catch (error) {
+    console.error("Error fetching user saved posts:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
 
 
 

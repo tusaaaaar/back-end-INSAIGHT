@@ -40,6 +40,8 @@ require('dotenv').config(); // For dotenv
 // const cookieParser = require('cookie-parser');
 
 const Users = require('./models/Usersmodel');
+
+const Post = require('./models/Post');
 const { url } = require('inspector');
 
 const app = express();
@@ -847,8 +849,52 @@ app.get("/search", async (req, res) => {
 });
 
 const ecoRoute = require("./routes/ecoRoutes");
+const { MongoUnexpectedServerResponseError } = require('mongodb');
 app.use("/api/eco",ecoRoute);
 
+
+// Example route
+app.get('/profile/:id', async (req, res) => {
+  console.log("Get user profile on click was called");
+  const userId = req.params.id;
+
+  try {
+    // Fetch user details (excluding password)
+    const user = await Users.findById(userId)
+      .select('-password')
+      .populate('followers', 'username profilePicture')
+      .populate('following', 'username profilePicture');
+
+    // Fetch posts made by this user
+    const posts = await Post.find({ user: userId })
+      .sort({ createdAt: -1 })
+      .populate('likes', 'username')
+      .populate({
+        path: 'comments',
+        populate: {
+          path: 'user',
+          select: 'username profilePicture'
+        }
+      });
+
+    const followersCount = user.followers.length;
+    const followingCount = user.following.length;
+    const postCount = posts.length;
+
+    // Send full profile object
+    res.json({
+      user,
+      posts,
+      followersCount,
+      followingCount,
+      postCount
+    });
+
+  } catch (err) {
+    console.error("Error fetching user profile:", err);
+    res.status(500).json({ error: 'Something went wrong while fetching profile' });
+  }
+});
 
 
 
